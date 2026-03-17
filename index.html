@@ -440,7 +440,7 @@ function loadFile(file) {
     document.getElementById('pauseBtn').disabled = false;
     document.getElementById('muteBtn').disabled = false;
     document.getElementById('saveBtn').disabled = false;
-    document.getElementById('statusLabel').textContent = '実行中';
+    document.getElementById('statusLabel').textContent = '';
     document.getElementById('statusLabel').className = 'status active';
     URL.revokeObjectURL(url);
     startLoop();
@@ -569,7 +569,7 @@ function resetImage() {
   document.getElementById('pauseBtn').disabled = true;
   document.getElementById('muteBtn').disabled = true;
   document.getElementById('saveBtn').disabled = true;
-  document.getElementById('statusLabel').textContent = '画像をドロップ';
+  document.getElementById('statusLabel').textContent = '';
   document.getElementById('statusLabel').className = 'status';
   document.getElementById('fileInput').value = '';
 }
