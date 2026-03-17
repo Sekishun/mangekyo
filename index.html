@@ -374,8 +374,8 @@ input[type="range"]::-webkit-slider-thumb {
       <div class="block">
         <div class="block-title">操作</div>
         <button class="btn primary" id="pauseBtn" disabled onclick="togglePause()">⏸ 一時停止</button>
-        <button class="btn" id="muteBtn" disabled onclick="toggleMute()">🔊 音楽ON</button>
-        <button class="btn" id="saveBtn" disabled onclick="saveFrame()">💾 フレーム保存</button>
+        <button class="btn" id="muteBtn" disabled onclick="toggleMute()">音楽ON</button>
+        <button class="btn" id="saveBtn" disabled onclick="saveFrame()">フレーム保存</button>
         <button class="btn" onclick="resetImage()">↩ 画像を変更</button>
       </div>
 
@@ -449,7 +449,7 @@ function loadFile(file) {
     muted = false;
     bgm.play().catch(() => {});
     const muteBtn = document.getElementById('muteBtn');
-    muteBtn.textContent = '🔊 音楽ON';
+    muteBtn.textContent = '音楽ON';
     muteBtn.classList.remove('muted');
   };
   image.src = url;
@@ -547,7 +547,7 @@ function toggleMute() {
   muted = !muted;
   bgm.volume = muted ? 0 : 1;
   const btn = document.getElementById('muteBtn');
-  btn.textContent = muted ? '🔇 音楽OFF' : '🔊 音楽ON';
+  btn.textContent = muted ? '音楽OFF' : '音楽ON';
   btn.classList.toggle('muted', muted);
 }
 
