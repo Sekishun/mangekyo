@@ -7,7 +7,6 @@
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-
   gtag('config', 'G-M03Z4BDHN2');
 </script>
 <meta charset="UTF-8">
@@ -77,6 +76,12 @@ header {
   margin-left: 8px;
 }
 
+.tagline {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--mute);
+}
+
 .status {
   margin-left: auto;
   font-size: 0.63rem;
@@ -108,7 +113,6 @@ canvas#output {
   max-height: 100%;
 }
 
-/* Drop overlay */
 .drop-overlay {
   position: absolute;
   inset: 0;
@@ -167,7 +171,6 @@ canvas#output {
   color: var(--text);
 }
 
-/* Sidebar */
 .sidebar {
   border-left: 1px solid var(--border);
   background: var(--panel);
@@ -190,7 +193,6 @@ canvas#output {
   margin-bottom: 14px;
 }
 
-/* Thumb */
 .thumb-wrap {
   width: 100%;
   aspect-ratio: 1;
@@ -221,7 +223,6 @@ canvas#output {
   box-shadow: 0 0 5px var(--gold);
 }
 
-/* Segment buttons */
 .seg-grid {
   display: grid;
   grid-template-columns: repeat(4,1fr);
@@ -243,9 +244,7 @@ canvas#output {
 .seg-btn:hover { border-color: var(--gold-glow); color: var(--text); }
 .seg-btn.active { border-color: var(--gold); color: var(--gold); background: var(--gold-glow); }
 
-/* Range controls */
 .knobs { display: flex; flex-direction: column; gap: 13px; }
-
 .knob { display: flex; flex-direction: column; gap: 5px; }
 
 .knob-hd {
@@ -275,10 +274,6 @@ input[type="range"]::-webkit-slider-thumb {
   box-shadow: 0 0 6px rgba(201,168,76,0.5);
 }
 
-/* Blend mode */
-.mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
-
-/* Buttons */
 .btn {
   padding: 9px 12px;
   background: transparent;
@@ -296,13 +291,16 @@ input[type="range"]::-webkit-slider-thumb {
 
 .btn + .btn { margin-top: 6px; }
 .btn:hover { border-color: var(--mute); background: rgba(255,255,255,0.02); }
-.btn.active, .btn.primary { border-color: var(--gold); color: var(--gold); }
-.btn.active:hover, .btn.primary:hover { background: var(--gold-glow); }
+.btn.primary { border-color: var(--gold); color: var(--gold); }
+.btn.primary:hover { background: var(--gold-glow); }
+.btn.muted { border-color: var(--mute); color: var(--mute); }
 .btn:disabled { opacity: 0.3; cursor: default; pointer-events: none; }
 </style>
 </head>
-  
+
 <body>
+<audio id="bgm" src="https://raw.githubusercontent.com/Sekishun/mangekyo/main/omene.mp3" loop preload="auto"></audio>
+
 <div class="app">
   <header>
     <div class="logo">万華鏡 <em>Kaleidoscope</em></div>
@@ -311,7 +309,6 @@ input[type="range"]::-webkit-slider-thumb {
   </header>
 
   <div class="body">
-    <!-- Canvas -->
     <div class="canvas-wrap" id="canvasWrap">
       <canvas id="output"></canvas>
 
@@ -327,7 +324,6 @@ input[type="range"]::-webkit-slider-thumb {
       </div>
     </div>
 
-    <!-- Sidebar -->
     <div class="sidebar">
 
       <div class="block" id="thumbBlock" style="display:none">
@@ -376,18 +372,9 @@ input[type="range"]::-webkit-slider-thumb {
       </div>
 
       <div class="block">
-        <div class="block-title">合成モード</div>
-        <div class="mode-grid">
-          <button class="btn active" onclick="setBlend('source-over',this)">通常</button>
-          <button class="btn" onclick="setBlend('screen',this)">スクリーン</button>
-          <button class="btn" onclick="setBlend('lighter',this)">加算</button>
-          <button class="btn" onclick="setBlend('multiply',this)">乗算</button>
-        </div>
-      </div>
-
-      <div class="block">
         <div class="block-title">操作</div>
         <button class="btn primary" id="pauseBtn" disabled onclick="togglePause()">⏸ 一時停止</button>
+        <button class="btn" id="muteBtn" disabled onclick="toggleMute()">🔊 音楽ON</button>
         <button class="btn" id="saveBtn" disabled onclick="saveFrame()">💾 フレーム保存</button>
         <button class="btn" onclick="resetImage()">↩ 画像を変更</button>
       </div>
@@ -397,20 +384,19 @@ input[type="range"]::-webkit-slider-thumb {
 </div>
 
 <script>
-// ── Elements ───────────────────────────────────────────────
 const outputCanvas = document.getElementById('output');
 const ctx = outputCanvas.getContext('2d');
 const thumbCanvas = document.getElementById('thumbCanvas');
 const thumbCtx = thumbCanvas.getContext('2d');
 const dropOverlay = document.getElementById('dropOverlay');
 const canvasWrap = document.getElementById('canvasWrap');
+const bgm = document.getElementById('bgm');
 
-// ── State ──────────────────────────────────────────────────
 let img = null;
 let animId = null;
 let paused = false;
+let muted = false;
 let segments = 8;
-let blendMode = 'source-over';
 
 const p = {
   spinSpeed:    0.40,
@@ -419,7 +405,6 @@ const p = {
   sampleRadius: 0.40,
 };
 
-// ── Resize canvas to fit wrapper ───────────────────────────
 function resize() {
   const s = Math.min(canvasWrap.clientWidth, canvasWrap.clientHeight, 900);
   outputCanvas.width = s;
@@ -428,7 +413,6 @@ function resize() {
 resize();
 window.addEventListener('resize', resize);
 
-// ── File loading ───────────────────────────────────────────
 document.getElementById('fileInput').addEventListener('change', e => {
   if (e.target.files[0]) loadFile(e.target.files[0]);
 });
@@ -454,16 +438,23 @@ function loadFile(file) {
     dropOverlay.classList.add('hidden');
     document.getElementById('thumbBlock').style.display = '';
     document.getElementById('pauseBtn').disabled = false;
+    document.getElementById('muteBtn').disabled = false;
     document.getElementById('saveBtn').disabled = false;
     document.getElementById('statusLabel').textContent = '実行中';
     document.getElementById('statusLabel').className = 'status active';
     URL.revokeObjectURL(url);
     startLoop();
+    // 画像選択がユーザー操作なので自動再生が許可される
+    bgm.volume = 1;
+    muted = false;
+    bgm.play().catch(() => {});
+    const muteBtn = document.getElementById('muteBtn');
+    muteBtn.textContent = '🔊 音楽ON';
+    muteBtn.classList.remove('muted');
   };
   image.src = url;
 }
 
-// ── Thumbnail ──────────────────────────────────────────────
 function drawThumb() {
   const W = 220, H = 220;
   thumbCanvas.width = W; thumbCanvas.height = H;
@@ -485,17 +476,6 @@ function updateThumbRing(nx, ny, nr) {
   ring.style.height = r*2 + 'px';
 }
 
-// ── Kaleidoscope render ────────────────────────────────────
-// Pure Canvas 2D technique:
-//   For each of N segments:
-//     1. Save context, rotate to segment angle
-//     2. Mirror every other segment (scale Y by -1)
-//     3. Clip to wedge (pie slice)
-//     4. Draw source image scaled so the sample circle fills the canvas radius
-//     5. Restore
-// The "sample center" drifts slowly over the image for organic animation.
-// The whole canvas rotates slowly for spin effect.
-
 function draw(ts) {
   if (!img) return;
 
@@ -503,25 +483,15 @@ function draw(ts) {
   const R = W / 2;
   const sliceAngle = (Math.PI * 2) / segments;
 
-  // Animated sample center (normalized 0–1)
   const d = p.driftSpeed * 0.00045;
   const nx = 0.5 + Math.cos(ts * d * 1.00) * 0.22;
   const ny = 0.5 + Math.sin(ts * d * 0.71) * 0.22;
 
-  // Animated zoom breath
   const zoom = 1 + Math.sin(ts * 0.00038) * p.zoomAmp;
-
-  // Radius of sample region in source pixels
   const sampleR = Math.min(img.width, img.height) * p.sampleRadius * zoom;
-
-  // Scale factor: sampleR in source → R on canvas
   const scale = R / sampleR;
-
-  // Source center in pixels
   const sx = nx * img.width;
   const sy = ny * img.height;
-
-  // Global rotation
   const globalRot = ts * p.spinSpeed * 0.00028;
 
   updateThumbRing(nx, ny, p.sampleRadius * zoom * 0.48);
@@ -531,34 +501,22 @@ function draw(ts) {
   ctx.translate(R, R);
   ctx.rotate(globalRot);
 
-  ctx.globalCompositeOperation = blendMode;
-
   for (let i = 0; i < segments; i++) {
     ctx.save();
-
-    // Rotate to this segment's position
     ctx.rotate(i * sliceAngle);
-
-    // Mirror alternate segments to create the seamless tiling
     if (i % 2 === 1) ctx.scale(1, -1);
-
-    // Clip to wedge centred on +X axis
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.arc(0, 0, R + 1, -sliceAngle / 2, sliceAngle / 2);
     ctx.closePath();
     ctx.clip();
-
-    // Draw source image: scale so sampleR → R, translate so (sx,sy) → (0,0)
     ctx.scale(scale, scale);
     ctx.drawImage(img, -sx, -sy);
-
     ctx.restore();
   }
 
   ctx.restore();
 
-  // Soft circular vignette
   ctx.globalCompositeOperation = 'source-over';
   const vg = ctx.createRadialGradient(R, R, R * 0.6, R, R, R * 1.05);
   vg.addColorStop(0, 'rgba(0,0,0,0)');
@@ -567,7 +525,6 @@ function draw(ts) {
   ctx.fillRect(0, 0, W, W);
 }
 
-// ── Loop ───────────────────────────────────────────────────
 function loop(ts) {
   if (!paused) draw(ts);
   animId = requestAnimationFrame(loop);
@@ -579,10 +536,19 @@ function startLoop() {
   animId = requestAnimationFrame(loop);
 }
 
-// ── Controls ───────────────────────────────────────────────
 function togglePause() {
   paused = !paused;
   document.getElementById('pauseBtn').textContent = paused ? '▶ 再生' : '⏸ 一時停止';
+  if (paused) { bgm.pause(); }
+  else { bgm.play().catch(() => {}); }
+}
+
+function toggleMute() {
+  muted = !muted;
+  bgm.volume = muted ? 0 : 1;
+  const btn = document.getElementById('muteBtn');
+  btn.textContent = muted ? '🔇 音楽OFF' : '🔊 音楽ON';
+  btn.classList.toggle('muted', muted);
 }
 
 function saveFrame() {
@@ -594,24 +560,20 @@ function saveFrame() {
 
 function resetImage() {
   if (animId) { cancelAnimationFrame(animId); animId = null; }
+  bgm.pause();
+  bgm.currentTime = 0;
   img = null;
   ctx.clearRect(0, 0, outputCanvas.width, outputCanvas.height);
   dropOverlay.classList.remove('hidden');
   document.getElementById('thumbBlock').style.display = 'none';
   document.getElementById('pauseBtn').disabled = true;
+  document.getElementById('muteBtn').disabled = true;
   document.getElementById('saveBtn').disabled = true;
   document.getElementById('statusLabel').textContent = '画像をドロップ';
   document.getElementById('statusLabel').className = 'status';
   document.getElementById('fileInput').value = '';
 }
 
-function setBlend(mode, el) {
-  blendMode = mode;
-  document.querySelectorAll('.mode-grid .btn').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-}
-
-// Segment buttons
 document.querySelectorAll('.seg-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     segments = parseInt(btn.dataset.n);
@@ -620,7 +582,6 @@ document.querySelectorAll('.seg-btn').forEach(btn => {
   });
 });
 
-// Range bindings
 function bindRange(id, key, valId, fmt, transform) {
   const el = document.getElementById(id);
   el.addEventListener('input', () => {
