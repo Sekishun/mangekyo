@@ -295,11 +295,61 @@ input[type="range"]::-webkit-slider-thumb {
 .btn.primary:hover { background: var(--gold-glow); }
 .btn.muted { border-color: var(--mute); color: var(--mute); }
 .btn:disabled { opacity: 0.3; cursor: default; pointer-events: none; }
+
+/* Share button — sparkle accent */
+.btn.share {
+  border-color: #7b68c8;
+  color: #9d8fe0;
+  position: relative;
+  overflow: hidden;
+}
+.btn.share:hover {
+  background: rgba(123,104,200,0.08);
+  border-color: #9d8fe0;
+}
+.btn.share::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(157,143,224,0.12) 50%, transparent 60%);
+  transform: translateX(-100%);
+  transition: transform 0.4s;
+}
+.btn.share:not(:disabled):hover::after {
+  transform: translateX(100%);
+}
+
+/* Toast notification */
+#shareToast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%) translateY(12px);
+  background: #1e1735;
+  border: 1px solid #7b68c8;
+  color: #9d8fe0;
+  font-family: 'Noto Serif JP', serif;
+  font-size: 1.3rem;
+  letter-spacing: 0.1em;
+  padding: 10px 22px;
+  border-radius: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+  z-index: 999;
+  white-space: nowrap;
+}
+#shareToast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
 </style>
 </head>
 
 <body>
 <audio id="bgm" src="https://raw.githubusercontent.com/Sekishun/mangekyo/main/omene.mp3" loop preload="auto"></audio>
+
+<div id="shareToast">✦ クリップボードにコピーしました</div>
 
 <div class="app">
   <header>
@@ -315,7 +365,7 @@ input[type="range"]::-webkit-slider-thumb {
       <div class="drop-overlay" id="dropOverlay">
         <input type="file" id="fileInput" accept="image/*">
         <div class="drop-ring">
-          <span class="drop-icon"></span>
+          <span class="drop-icon">🌸</span>
         </div>
         <div class="drop-label">
           <strong>画像をドロップ</strong>
@@ -376,6 +426,7 @@ input[type="range"]::-webkit-slider-thumb {
         <button class="btn primary" id="pauseBtn" disabled onclick="togglePause()">⏸ 一時停止</button>
         <button class="btn" id="muteBtn" disabled onclick="toggleMute()">音楽ON</button>
         <button class="btn" id="saveBtn" disabled onclick="saveFrame()">フレーム保存</button>
+        <button class="btn share" id="shareBtn" disabled onclick="shareFrame()">✦ 共有する</button>
         <button class="btn" onclick="resetImage()">↩ 画像を変更</button>
       </div>
 
@@ -440,11 +491,11 @@ function loadFile(file) {
     document.getElementById('pauseBtn').disabled = false;
     document.getElementById('muteBtn').disabled = false;
     document.getElementById('saveBtn').disabled = false;
+    document.getElementById('shareBtn').disabled = false;
     document.getElementById('statusLabel').textContent = '';
     document.getElementById('statusLabel').className = 'status active';
     URL.revokeObjectURL(url);
     startLoop();
-    // 画像選択がユーザー操作なので自動再生が許可される
     bgm.volume = 1;
     muted = false;
     bgm.play().catch(() => {});
@@ -558,6 +609,63 @@ function saveFrame() {
   a.click();
 }
 
+// ---------- 共有機能 ----------
+function showToast(msg) {
+  const t = document.getElementById('shareToast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+async function shareFrame() {
+  const shareText = '万華鏡メーカー https://sekishun.github.io/mangekyo/';
+
+  // Web Share API（モバイル等、画像共有対応ブラウザ）
+  if (navigator.canShare) {
+    try {
+      const blob = await new Promise(resolve => outputCanvas.toBlob(resolve, 'image/png'));
+      const file = new File([blob], 'kaleidoscope.png', { type: 'image/png' });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ text: shareText, files: [file] });
+        return;
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        // 画像付き共有が失敗した場合はテキストのみで試みる
+      } else {
+        return; // ユーザーがキャンセル
+      }
+    }
+  }
+
+  // テキストのみWeb Share
+  if (navigator.share) {
+    try {
+      await navigator.share({ text: shareText });
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+    }
+  }
+
+  // フォールバック：クリップボードにコピー＋画像ダウンロード
+  try {
+    // テキストをクリップボードへ
+    await navigator.clipboard.writeText(shareText);
+
+    // フレーム画像を自動ダウンロード
+    const a = document.createElement('a');
+    a.download = 'kaleidoscope_share_' + Date.now() + '.png';
+    a.href = outputCanvas.toDataURL();
+    a.click();
+
+    showToast('✦ テキストをコピー＆画像を保存しました');
+  } catch {
+    showToast('✦ 共有できませんでした');
+  }
+}
+// --------------------------------
+
 function resetImage() {
   if (animId) { cancelAnimationFrame(animId); animId = null; }
   bgm.pause();
@@ -569,6 +677,7 @@ function resetImage() {
   document.getElementById('pauseBtn').disabled = true;
   document.getElementById('muteBtn').disabled = true;
   document.getElementById('saveBtn').disabled = true;
+  document.getElementById('shareBtn').disabled = true;
   document.getElementById('statusLabel').textContent = '';
   document.getElementById('statusLabel').className = 'status';
   document.getElementById('fileInput').value = '';
